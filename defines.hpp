@@ -1,0 +1,4 @@
+#pragma once
+
+#define DEFAULT_SERVER_PORT 52225
+#define MESSAGE_BUFFER_SIZE 4096
