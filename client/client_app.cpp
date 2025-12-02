@@ -45,7 +45,10 @@ void client_app::start_reading_from_server()
         if(!ec)
         {
             std::string message(self->read_buffer_.data(), bytes_transferred);
-            std::cout << message;
+            size_t clear_length = std::max(size_t(200), message.length() + 50);
+            std::cout << "\r" << std::string(clear_length, ' ') << "\r";
+            std::cout << message;  // вывод сообщения от сервера
+            std::cout << "[you]: " << std::flush;  // восстановление приглашения ввода
             self->start_reading_from_server();
         }
         else
@@ -59,8 +62,11 @@ void client_app::start_reading_from_server()
 void client_app::handle_user_input()
 {
     std::string line;
-    while(std::getline(std::cin, line))
+    while(true)
     {
+        std::cout << "[you]: " << std::flush;
+        if(!std::getline(std::cin, line))
+            break;
         if(line.empty())
             continue;
         if(line == "/quit" || line == "/exit")

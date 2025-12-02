@@ -13,7 +13,7 @@ void client::disconnect()
 {
     boost::system::error_code ec;
     socket_.close(ec);
-    if(auto srv = server_ref.lock())
+    if(auto srv = server_ref_.lock())
     {
         srv->remove_client(shared_from_this());
     }
@@ -30,7 +30,7 @@ void client::start_reading()
         {
             std::string msg(self->read_buffer_.data(), bytes_transferred);
             std::cout << "Bytes transferred from client: " << bytes_transferred << std::endl;
-            if(auto srv = self->server_ref.lock())
+            if(auto srv = self->server_ref_.lock())
             {
                 srv->broadcast(self, msg);
             }
@@ -63,6 +63,13 @@ void client::send_message(const std::string& str)
 void client::set_client_nickname(std::string nickname)
 {
     std::size_t MAX_NICKNAME_LEN = 64;
+    nickname.erase(std::remove_if(nickname.begin(), nickname.end(),
+    [](unsigned char c)
+    {
+        // только буквы, цифры, подчеркивание, дефис и пробелы
+        return !(std::isalnum(c) || c == '_' || c == '-' || c == ' ');
+    }
+    ), nickname.end());
     if(nickname.size() > MAX_NICKNAME_LEN)
         nickname.resize(MAX_NICKNAME_LEN);
     while (!nickname.empty() && std::isspace((unsigned char)nickname.back()))
@@ -71,8 +78,12 @@ void client::set_client_nickname(std::string nickname)
         nickname.erase(nickname.begin());
     if(nickname.empty())
         nickname = "Unnamed";
+    if(auto srv = server_ref_.lock())
+    {
+        nickname = srv->make_unique_nickname(nickname);
+    }
     client_nickname_ = nickname;
-    std::cout << "Cleint nickname set to: " << client_nickname_ << std::endl;
+    std::cout << "Client nickname set to: " << client_nickname_ << std::endl;
 }
 
 void client::request_client_nickname()

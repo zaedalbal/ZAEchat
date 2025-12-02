@@ -17,7 +17,9 @@ class server : public std::enable_shared_from_this<server> // наследова
 
         void start(); // метод с запускается сервер
 
-        void broadcast(std::shared_ptr<client> sender, const std::string& message); // рассылка всем кроме отправителя
+        void broadcast(std::shared_ptr<client> sender, const std::string& message); // рассылка сообщения всем кроме отправителя
+
+        std::string make_unique_nickname(const std::string& raw_nickname);
 
         unsigned short get_port(); // получить порт
 
@@ -26,9 +28,13 @@ class server : public std::enable_shared_from_this<server> // наследова
 
     private:
         boost::asio::io_context& io_context_; // указатель на объект контекста ввода/вывода из boost asio
+
         boost::asio::ip::tcp::acceptor acceptor_; // acceptor чтобы принять соеденение клиента
-        std::set<std::shared_ptr<client>> clients_; // контейнер с клиентами
+
+        std::set<std::shared_ptr<client>> clients_; // контейнер с клиентами !!!(ВСЕ ОПЕРАЦИИ С КОНТЕЙНЕРОМ ОБОРАЧИВАТЬ В POST())!!!
+
         boost::asio::strand<boost::asio::io_context::executor_type> strand_; // для нормальной работы с потоками
-        unsigned short port_;
+
+        unsigned short port_; // порт сервера
 
 };

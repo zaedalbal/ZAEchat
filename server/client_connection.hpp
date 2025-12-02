@@ -20,13 +20,13 @@ class client : public std::enable_shared_from_this<client> // наследова
 
         std::string get_nickname();
 
-        std::weak_ptr<server> server_ref; // указатель на сервер
+        std::weak_ptr<server> server_ref_; // указатель на сервер
     private:
         void disconnect(); // выход с сервера
 
         void start_reading(); // отправка данных серверу
 
-        void request_client_nickname();
+        void request_client_nickname(); // запрос никнейма у пользователя
 
         void set_client_nickname(std::string nickname); // изменение имени пользователя
 

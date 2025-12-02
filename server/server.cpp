@@ -22,13 +22,12 @@ void server::accept_connection()
         {
             std::cout << "Client connected\n";
             auto t = std::make_shared<client>(std::move(client_socket));
-            t->server_ref = shared_from_this();
+            t->server_ref_ = shared_from_this();
             boost::asio::post(strand_, [this, t]()
             {
                 clients_.insert(t);
+                t->start();
             });
-            clients_.insert(t);
-            t->start();
         }
         else
         {
@@ -73,6 +72,28 @@ void server::remove_client(std::shared_ptr<client> c)
     clients_.erase(c);
     });
     std::cout << "Removed client from server" << std::endl;
+}
+
+std::string server::make_unique_nickname(const std::string& raw_nickname)
+{
+    std::string nickname = raw_nickname;
+    int counter = 1;
+    bool nickname_exists = true;
+    while(nickname_exists)
+    {
+        nickname_exists = false;
+        for(const auto& client_ptr : clients_)
+        {
+            if(client_ptr->get_nickname() == nickname)
+            {
+                nickname_exists = true;
+                nickname = raw_nickname + "(" + std::to_string(counter) + ")";
+                counter++;
+                break;
+            }
+        }
+    }
+    return nickname;
 }
 
 unsigned short server::get_port()
