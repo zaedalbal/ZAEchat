@@ -18,7 +18,7 @@ class client_app : public std::enable_shared_from_this<client_app> // насле
 
         void send_message(const std::string& message); // отправка сообщения
 
-        void start_reading_from_server(); // чтение с сервера
+        boost::asio::awaitable<void> start_reading_from_server(); // чтение с сервера
         
         void handle_user_input(); // обработка ввода из консоли
 

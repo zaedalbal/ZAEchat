@@ -24,7 +24,7 @@ class server : public std::enable_shared_from_this<server> // наследова
         unsigned short get_port(); // получить порт
 
     private:
-        void accept_connection(); // принимает клиента
+        boost::asio::awaitable<void> accept_connection(); // принимает клиента
 
     private:
         boost::asio::io_context& io_context_; // указатель на объект контекста ввода/вывода из boost asio

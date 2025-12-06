@@ -10,31 +10,38 @@ strand_(boost::asio::make_strand(io_context_))
 
 void server::start()
 {
-    accept_connection();
+    auto self = shared_from_this();
+    boost::asio::co_spawn(acceptor_.get_executor(),
+        [self]() -> boost::asio::awaitable<void>
+        {
+            co_await self->accept_connection();
+        },
+        boost::asio::detached
+    );
 }
 
-void server::accept_connection()
+boost::asio::awaitable<void> server::accept_connection()
 {
-    acceptor_.async_accept(
-    [this](const boost::system::error_code& ec, boost::asio::ip::tcp::socket client_socket)
+    auto self = shared_from_this();
+    try
     {
-        if(!ec)
+        while(true)
         {
-            std::cout << "Client connected\n";
-            auto t = std::make_shared<client>(std::move(client_socket));
-            t->server_ref_ = shared_from_this();
-            boost::asio::post(strand_, [this, t]()
+            boost::asio::ip::tcp::socket cliet_socket = co_await acceptor_.async_accept(boost::asio::use_awaitable);
+            std::cout << "Client connected" << std::endl;
+            auto t = std::make_shared<client>(std::move(cliet_socket));
+            t->server_ref_ = self;
+            boost::asio::post(strand_, [this, t]
             {
                 clients_.insert(t);
                 t->start();
             });
         }
-        else
-        {
-            std::cout << "Error: " << ec.message() << std::endl;
-        }
-        accept_connection();
-    });
+    }
+    catch(std::exception& ex)
+    {
+        std::cerr << "Accept error: " << ex.what();
+    }
 }
 
 void server::broadcast(std::shared_ptr<client> sender, const std::string& raw_message)

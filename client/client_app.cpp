@@ -36,14 +36,14 @@ void client_app::send_message(const std::string& raw_message)
     });
 }
 
-void client_app::start_reading_from_server()
+boost::asio::awaitable<void> client_app::start_reading_from_server()
 {
     auto self = shared_from_this();
-    socket_.async_read_some(boost::asio::buffer(read_buffer_), 
-    [self](const boost::system::error_code& ec, std::size_t bytes_transferred)
+    try
     {
-        if(!ec)
+        while(socket_.is_open())
         {
+            auto bytes_transferred = co_await socket_.async_read_some(boost::asio::buffer(read_buffer_), boost::asio::use_awaitable);
             std::string message(self->read_buffer_.data(), bytes_transferred);
             size_t clear_length = std::max(size_t(200), message.length() + 50);
             std::cout << "\r" << std::string(clear_length, ' ') << "\r";
@@ -51,12 +51,12 @@ void client_app::start_reading_from_server()
             std::cout << "[you]: " << std::flush;  // восстановление приглашения ввода
             self->start_reading_from_server();
         }
-        else
-        {
-            std::cerr << "Disconnected from server: " << ec.message() << std::endl;
-            self->socket_.close();
-        }
-    });
+    }
+    catch(const std::exception& ex)
+    {
+        std::cerr << "Disconnected from server: " << ex.what() << std::endl;
+        self->socket_.close();
+    }
 }
 
 void client_app::handle_user_input()
@@ -116,6 +116,12 @@ void client_app::send_nickname_and_start()
     {
         std::cout << std::string(buffer.data(), len) << std::flush;
     }
-    
-    start_reading_from_server();
+    auto self = shared_from_this();
+    boost::asio::co_spawn(socket_.get_executor(),
+    [self]()->boost::asio::awaitable<void>
+    {
+        co_await self->start_reading_from_server();
+    },
+    boost::asio::detached
+    );
 }

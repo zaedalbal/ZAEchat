@@ -6,7 +6,13 @@ client::client(boost::asio::ip::tcp::socket sock) : socket_(std::move(sock)), cl
 
 void client::start()
 {
-    request_client_nickname();
+    auto self = shared_from_this();
+    boost::asio::co_spawn(socket_.get_executor(),
+    [self]()->boost::asio::awaitable<void>
+    {
+        co_await self->request_client_nickname();
+    },
+    boost::asio::detached);
 }
 
 void client::disconnect()
@@ -20,44 +26,42 @@ void client::disconnect()
     std::cout << "Client disconnected" << std::endl;
 }
 
-void client::start_reading()
+boost::asio::awaitable<void> client::start_reading()
 {
     auto self = shared_from_this();
-    socket_.async_read_some(boost::asio::buffer(read_buffer_, MESSAGE_BUFFER_SIZE),
-    [self](const boost::system::error_code& ec, std::size_t bytes_transferred)
+    try
     {
-        if(!ec)
-        {
-            std::string msg(self->read_buffer_.data(), bytes_transferred);
-            std::cout << "Bytes transferred from client: " << bytes_transferred << std::endl;
-            if(auto srv = self->server_ref_.lock())
-            {
-                srv->broadcast(self, msg);
-            }
-            self->start_reading(); // заново читать данные
-        }
-        else
-        {
-            self->disconnect();
-        }
-    });
+    while(socket_.is_open())
+    {
+        auto bytes_transferred = co_await socket_.async_read_some(boost::asio::buffer(read_buffer_), boost::asio::use_awaitable);
+        std::string msg(read_buffer_.data(), bytes_transferred);
+        if(auto srv = self->server_ref_.lock())
+            srv->broadcast(self, msg);
+    }
+    }
+    catch(const std::exception& ex)
+    {
+        self->disconnect();
+    }
 }
 
 void client::send_message(const std::string& str)
 {
     auto self = shared_from_this();
-    boost::asio::async_write(socket_, boost::asio::buffer(str),
-    [self](const boost::system::error_code& ec, size_t bytes_transferred)
+    boost::asio::co_spawn(socket_.get_executor(),
+    [self, str]()->boost::asio::awaitable<void>
     {
-        if(!ec)
+        try
         {
-            std::cout << "Bytes transferred to client: " << bytes_transferred << std::endl;
+            co_await boost::asio::async_write(self->socket_, boost::asio::buffer(str), boost::asio::use_awaitable);
         }
-        else
+        catch(std::exception& ex)
         {
             self->disconnect();
         }
-    });
+    },
+    boost::asio::detached
+    );
 }
 
 void client::set_client_nickname(std::string nickname)
@@ -86,27 +90,14 @@ void client::set_client_nickname(std::string nickname)
     std::cout << "Client nickname set to: " << client_nickname_ << std::endl;
 }
 
-void client::request_client_nickname()
+boost::asio::awaitable<void> client::request_client_nickname()
 {
     auto self = shared_from_this();
-    auto buffer = std::make_shared<std::array<char, MESSAGE_BUFFER_SIZE>>();
-    send_message("Enter nickname: ");
-    socket_.async_read_some(boost::asio::buffer(*buffer, MESSAGE_BUFFER_SIZE),
-    [self, buffer](const boost::system::error_code &ec, std::size_t bytes_transferred)
-    {
-        if(!ec)
-        {
-            std::string nickname(buffer->data(), bytes_transferred);
-            self->set_client_nickname(nickname);
-            self->send_message("Welcome to the chat, " + self->client_nickname_ + "!\n");
-            self->start_reading();
-        }
-        else
-        {
-            self->disconnect();
-        }
-    }
-    );
+    co_await boost::asio::async_write(socket_, boost::asio::buffer("Enter nickname: "), boost::asio::use_awaitable);
+    auto bytes_transferred = co_await socket_.async_read_some(boost::asio::buffer(read_buffer_), boost::asio::use_awaitable);
+    set_client_nickname(std::string(read_buffer_.data(), bytes_transferred));
+    co_await boost::asio::async_write(socket_, boost::asio::buffer("Welcome to the chat, "+client_nickname_+"!\n"), boost::asio::use_awaitable);
+    co_await start_reading();
 }
 
 std::string client::get_nickname()

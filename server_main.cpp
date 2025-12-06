@@ -31,11 +31,11 @@ int main(int argc, char* argv[])
                 return 1;
             }
         }
-
         boost::asio::io_context context;
         auto srv = std::make_shared<server>(context, port);
 
         srv->start();
+        
         std::cout << "========================================" << std::endl;
         std::cout << "Chat server started successfully" << std::endl;
         std::cout << "Port: " << srv->get_port() << std::endl;
